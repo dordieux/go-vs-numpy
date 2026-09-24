@@ -1,0 +1,9 @@
+results/
+plots/
+*.jsonl
+bench-go
+bench-go-nosimd
+cpp/bench
+.venv/
+__pycache__/
+.DS_Store

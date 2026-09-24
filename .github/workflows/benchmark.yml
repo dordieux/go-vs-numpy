@@ -1,0 +1,87 @@
+name: benchmark
+
+# Runs the full sweep on a clean amd64 runner. A laptop is a poor benchmark
+# host — background indexing and security scanners skew wall-clock numbers by
+# 2x or more — so CI doubles as the reference environment. It also exercises
+# AVX2 (4 float64 lanes) instead of the 2 lanes an Apple Silicon Mac provides.
+
+on:
+  workflow_dispatch:
+    inputs:
+      sizes:
+        description: element counts to sweep
+        default: "1000,10000,100000,1000000,10000000,100000000"
+      mintime:
+        description: minimum accumulated seconds per measurement
+        default: "0.3"
+  push:
+    branches: [main]
+    paths:
+      - "go/**"
+      - "python/**"
+      - "cpp/**"
+      - "scripts/**"
+      - ".github/workflows/benchmark.yml"
+
+jobs:
+  bench:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.27"
+
+      - uses: astral-sh/setup-uv@v5
+
+      - name: Report CPU features
+        run: |
+          lscpu | grep -E "Model name|^CPU\(s\)|Flags" | sed 's/\(avx[^ ]*\)/**\1**/g' || true
+          echo "--- SIMD-relevant flags ---"
+          grep -o -E "avx512[a-z]*|avx2|avx|sse4_2" /proc/cpuinfo | sort -u | tr '\n' ' '
+          echo
+
+      - name: Run benchmarks
+        env:
+          SIZES: ${{ github.event.inputs.sizes || '1000,10000,100000,1000000,10000000,100000000' }}
+          MINTIME_S: ${{ github.event.inputs.mintime || '0.3' }}
+          GO: go
+        run: ./scripts/run_all.sh
+
+      - name: Verify cross-language parity
+        run: python3 scripts/verify.py results/all.jsonl
+
+      - name: Summarize
+        run: |
+          {
+            echo '## Benchmark results'
+            echo
+            echo "Runner: $(lscpu | grep 'Model name' | sed 's/.*: *//')"
+            echo "SIMD: $(grep -o -E 'avx512[a-z]*|avx2|avx' /proc/cpuinfo | sort -u | tr '\n' ' ')"
+            echo
+            echo '### 1e8 elements, wall time (ms, lower is better)'
+            echo
+            python3 - <<'PY'
+          import json
+          rows = [json.loads(l) for l in open("results/all.jsonl")]
+          by = {(r["op"], r["n"], r["lang"], r["impl"]): r["ns_min"] for r in rows}
+          N = 100_000_000
+          impls = [("python","numpy"),("python","numpy_mt"),
+                   ("go","scalar"),("go","simd"),("go","parallel"),("go","parallel_simd")]
+          print("| op | " + " | ".join(f"{l}/{i}" for l, i in impls) + " |")
+          print("|---" * (len(impls) + 1) + "|")
+          for op in ["clip","add","axpy","sqrt","exp","sum"]:
+              cells = []
+              for lang, impl in impls:
+                  v = by.get((op, N, lang, impl))
+                  cells.append("-" if v is None else f"{v/1e6:.1f}")
+              print(f"| {op} | " + " | ".join(cells) + " |")
+          PY
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: results-${{ github.run_id }}
+          path: results/*.jsonl

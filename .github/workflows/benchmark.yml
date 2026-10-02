@@ -83,7 +83,7 @@ jobs:
           echo "--- default width ---"
           /tmp/bench -ops sqrt -impls simd -sizes 100000000 -mintime 1.5s 2>&1 >/dev/null
           echo "--- forced to 128-bit ---"
-          GODEBUG=gosimd=128 /tmp/bench -ops sqrt -impls simd -sizes 100000000 -mintime 1.5s 2>&1 >/dev/null
+          GODEBUG=simd=128 /tmp/bench -ops sqrt -impls simd -sizes 100000000 -mintime 1.5s 2>&1 >/dev/null
 
       - name: Verify cross-language parity
         run: python3 scripts/verify.py results/all.jsonl

@@ -48,6 +48,14 @@ jobs:
           cd python
           uv run python -c "import numpy as np; np.show_runtime()" || true
 
+      - name: Record runner identity
+        run: |
+          {
+            echo "cpu_model=$(lscpu | grep 'Model name' | sed 's/.*: *//' | xargs)"
+            echo "cpu_count=$(nproc)"
+            echo "simd_flags=$(grep -o -E 'avx512[a-z]*|avx2|avx' /proc/cpuinfo | sort -u | tr '\n' ' ')"
+          } | tee results-runner.txt
+
       - name: Run benchmarks
         env:
           SIZES: ${{ github.event.inputs.sizes || '1000,10000,100000,1000000,10000000,100000000' }}
@@ -89,4 +97,6 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: results-${{ github.run_id }}
-          path: results/*.jsonl
+          path: |
+            results/*.jsonl
+            results-runner.txt

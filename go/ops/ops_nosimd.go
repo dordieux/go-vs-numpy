@@ -23,3 +23,5 @@ func AxpyParallelSIMD(dst, x, y []float64, alpha float64) {
 	AxpyParallel(dst, x, y, alpha)
 }
 func SqrtParallelSIMD(dst, src []float64) { SqrtParallel(dst, src) }
+
+func SumParallelSIMD(src []float64) float64 { return SumParallel(src) }

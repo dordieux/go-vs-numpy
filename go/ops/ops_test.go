@@ -144,6 +144,9 @@ func TestSumVariantsMatchScalar(t *testing.T) {
 			if got := SumSIMD(x); !almostEqual(got, want, 1e-9) {
 				t.Fatalf("sum/simd: n=%d got %v want %v", n, got, want)
 			}
+			if got := SumParallelSIMD(x); !almostEqual(got, want, 1e-9) {
+				t.Fatalf("sum/parallel_simd: n=%d got %v want %v", n, got, want)
+			}
 		}
 	}
 }

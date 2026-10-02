@@ -109,26 +109,47 @@ func ExpParallel(dst, src []float64) {
 	parallelChunks(len(src), func(lo, hi int) { ExpScalar(dst[lo:hi], src[lo:hi]) })
 }
 
-func SumParallel(src []float64) float64 {
-	n := len(src)
+// cacheLineFloats is how many float64 fit in a 64-byte cache line. Partial
+// sums are spaced this far apart so that two workers never write into the
+// same line; without the padding the stores contend even though each worker
+// only writes once.
+const cacheLineFloats = 8
+
+// parallelSum splits [0, n) across GOMAXPROCS goroutines, reduces each chunk
+// with sumChunk, and adds the partial results. sumChunk is what decides
+// whether the per-chunk work is scalar or SIMD.
+func parallelSum(n int, sumChunk func(lo, hi int) float64) float64 {
 	workers := runtime.GOMAXPROCS(0)
 	if workers > n {
 		workers = n
 	}
 	if workers <= 1 {
-		return SumScalar(src)
+		return sumChunk(0, n)
 	}
 	chunk := (n + workers - 1) / workers
-	partials := make([]float64, (n+chunk-1)/chunk)
+	nChunks := (n + chunk - 1) / chunk
+	partials := make([]float64, nChunks*cacheLineFloats)
+
 	var wg sync.WaitGroup
 	for w, lo := 0, 0; lo < n; w, lo = w+1, lo+chunk {
 		hi := min(lo+chunk, n)
 		wg.Add(1)
 		go func(w, lo, hi int) {
 			defer wg.Done()
-			partials[w] = SumScalar(src[lo:hi])
+			partials[w*cacheLineFloats] = sumChunk(lo, hi)
 		}(w, lo, hi)
 	}
 	wg.Wait()
-	return SumScalar(partials)
+
+	total := 0.0
+	for i := 0; i < nChunks; i++ {
+		total += partials[i*cacheLineFloats]
+	}
+	return total
+}
+
+func SumParallel(src []float64) float64 {
+	return parallelSum(len(src), func(lo, hi int) float64 {
+		return SumScalar(src[lo:hi])
+	})
 }

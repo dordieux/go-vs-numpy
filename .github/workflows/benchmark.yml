@@ -43,6 +43,11 @@ jobs:
           grep -o -E "avx512[a-z]*|avx2|avx|sse4_2" /proc/cpuinfo | sort -u | tr '\n' ' '
           echo
 
+      - name: Report NumPy SIMD dispatch
+        run: |
+          cd python
+          uv run python -c "import numpy as np; np.show_runtime()" || true
+
       - name: Run benchmarks
         env:
           SIZES: ${{ github.event.inputs.sizes || '1000,10000,100000,1000000,10000000,100000000' }}

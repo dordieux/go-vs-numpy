@@ -93,3 +93,12 @@ func AxpyParallelSIMD(dst, x, y []float64, alpha float64) {
 func SqrtParallelSIMD(dst, src []float64) {
 	parallelChunks(len(src), func(lo, hi int) { SqrtSIMD(dst[lo:hi], src[lo:hi]) })
 }
+
+// SumParallelSIMD reduces with the SIMD kernel on every chunk. Without this,
+// the parallel sum silently fell back to scalar accumulation, which caps the
+// achievable bandwidth well below what the hardware allows.
+func SumParallelSIMD(src []float64) float64 {
+	return parallelSum(len(src), func(lo, hi int) float64 {
+		return SumSIMD(src[lo:hi])
+	})
+}

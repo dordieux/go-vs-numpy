@@ -140,6 +140,7 @@ func main() {
 			{"scalar", func(_, x, _ []float64) { sink = ops.SumScalar(x) }, fromSink},
 			{"parallel", func(_, x, _ []float64) { sink = ops.SumParallel(x) }, fromSink},
 			{"simd", func(_, x, _ []float64) { sink = ops.SumSIMD(x) }, fromSink},
+			{"parallel_simd", func(_, x, _ []float64) { sink = ops.SumParallelSIMD(x) }, fromSink},
 		},
 	}
 

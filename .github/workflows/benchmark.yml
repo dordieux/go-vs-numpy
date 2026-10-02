@@ -47,6 +47,16 @@ jobs:
         run: |
           cd python
           uv run python -c "import numpy as np; np.show_runtime()" || true
+          # Which kernel each ufunc actually lands on. The build-wide baseline
+          # can be AVX2 while an individual kernel still targets SSE, which
+          # changes how a per-op comparison should be read.
+          uv run python - <<'PY' || true
+          from numpy.lib import introspect
+          for f in ("sqrt", "exp", "add", "maximum"):
+              info = introspect.opt_func_info(func_name=f).get(f, {})
+              dd = info.get("dd") or info.get("ddd") or {}
+              print(f"{f:8} float64 kernel -> {dd.get('current', '?')}")
+          PY
 
       - name: Record runner identity
         run: |

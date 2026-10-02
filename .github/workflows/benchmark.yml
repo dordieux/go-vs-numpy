@@ -73,6 +73,18 @@ jobs:
           GO: go
         run: ./scripts/run_all.sh
 
+      - name: Measure sqrt at a narrower vector width
+        # Does NumPy's sqrt lag because its kernel is 128-bit, or for some
+        # other reason? Force Go down to the same width and see whether it
+        # lands on NumPy's number.
+        run: |
+          cd go
+          GOEXPERIMENT=simd go build -o /tmp/bench ./cmd/bench
+          echo "--- default width ---"
+          /tmp/bench -ops sqrt -impls simd -sizes 100000000 -mintime 1.5s 2>&1 >/dev/null
+          echo "--- forced to 128-bit ---"
+          GODEBUG=gosimd=128 /tmp/bench -ops sqrt -impls simd -sizes 100000000 -mintime 1.5s 2>&1 >/dev/null
+
       - name: Verify cross-language parity
         run: python3 scripts/verify.py results/all.jsonl
 
